@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nexus-crm
+  namespace: default
+  labels:
+    app: nexus-crm
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nexus-crm
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: nexus-crm
+    spec:
+      # ── Graceful shutdown ────────────────────────────────
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: crm-app
+          image: your-registry/nexus-crm:latest   # ← update with your image
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 3001
+              name: http
+
+          # ── Env from ConfigMap ───────────────────────────
+          envFrom:
+            - configMapRef:
+                name: crm-config
+            - secretRef:
+                name: crm-db-secret
+
+          # ── Resource limits ──────────────────────────────
+          resources:
+            requests:
+              cpu:    "100m"
+              memory: "128Mi"
+            limits:
+              cpu:    "500m"
+              memory: "512Mi"
+
+          # ── Liveness probe ───────────────────────────────
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 3001
+            initialDelaySeconds: 15
+            periodSeconds:       20
+            failureThreshold:    3
+
+          # ── Readiness probe (checks both DB endpoints) ───
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: 3001
+            initialDelaySeconds: 10
+            periodSeconds:       10
+            failureThreshold:    3
+
+          # ── Security context ─────────────────────────────
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: false
+
+      # ── Pod anti-affinity (spread across AZs) ────────────
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: nexus-crm
+                topologyKey: topology.kubernetes.io/zone
