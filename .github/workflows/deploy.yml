@@ -2,7 +2,11 @@ name: Build and Push NexusCRM
 
 on:
   push:
-    branches: [ "main" ] # Trigger when you push to the main branch
+    branches: [ "main" ] # Triggers the build when you push to the main branch
+
+env:
+  # Opt into Node.js 24 to resolve deprecation warnings for actions
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-and-push:
@@ -16,6 +20,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
+          # Use the Personal Access Token stored in your GitHub Secrets
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Set up Docker Buildx
@@ -26,8 +31,8 @@ jobs:
         with:
           context: .
           push: true
-          # Tags the image exactly for your Docker Hub account
+          # Tags the image for your specific Docker Hub namespace
           tags: mohamedelsayed215/nexus-crm:latest
-          # Helps with build performance
+          # Leveraging GitHub Actions cache to speed up subsequent builds
           cache-from: type=gha
           cache-to: type=gha,mode=max
